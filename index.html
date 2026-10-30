@@ -1,0 +1,771 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" content="#090b0e">
+    <meta name="description" content="От бомжа до миллиардера — симулятор жизни в России.">
+    <title>От бомжа до миллиардера</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700;800&family=Russo+One&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        mono: ['JetBrains Mono', 'monospace'],
+                        display: ['Russo One', 'sans-serif']
+                    },
+                    colors: {
+                        cyber: '#39ff88',
+                        danger: '#ff3d57',
+                        dark: '#090b0e',
+                        panel: '#11151b'
+                    }
+                }
+            }
+        };
+    </script>
+
+    <style>
+        :root {
+            --bg: #090b0e;
+            --panel: #11151b;
+            --border: #252d36;
+            --text: #e5e7eb;
+            --muted: #89939f;
+            --green: #39ff88;
+            --red: #ff3d57;
+        }
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+        body {
+            margin: 0; background: var(--bg); color: var(--text);
+            font-family: 'JetBrains Mono', monospace; min-height: 100vh; min-height: 100dvh;
+            overflow-x: hidden; padding-bottom: calc(30px + env(safe-area-inset-bottom));
+        }
+        button { cursor: pointer; touch-action: manipulation; }
+        .hidden { display: none !important; }
+        .event-choice:disabled { opacity: .4; }
+        .cyber-title {
+            font-family: 'Russo One', sans-serif; letter-spacing: -1px;
+            text-shadow: 0 0 18px rgba(57,255,136,.25);
+        }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; }
+        .neon-border { border: 1px solid rgba(57,255,136,.35); box-shadow: 0 0 15px rgba(57,255,136,.06); }
+        .green-text { color: var(--green); }
+        .red-text { color: var(--red); }
+        .progress-track { background: #252d36; height: 9px; border-radius: 20px; overflow: hidden; }
+        .progress-fill { height: 100%; border-radius: 20px; transition: width .35s ease; }
+        .action-button {
+            background: #171e26; border: 1px solid #303b47; border-radius: 10px;
+            padding: 13px 12px; width: 100%; text-align: left; transition: .15s ease;
+        }
+        .action-button:active { transform: scale(.97); border-color: var(--green); }
+        .action-button:disabled { opacity: .35; cursor: not-allowed; }
+        .buy-button {
+            background: rgba(57,255,136,.09); color: var(--green);
+            border: 1px solid rgba(57,255,136,.3); border-radius: 8px;
+            padding: 9px 12px; font-weight: 800; font-size: 11px; white-space: nowrap;
+        }
+        .buy-button:disabled { opacity: .3; cursor: not-allowed; }
+        .buy-button:not(:disabled):active { transform: scale(.95); }
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,.82);
+            backdrop-filter: blur(7px); z-index: 100; display: flex;
+            align-items: center; justify-content: center; padding: 20px;
+        }
+        .modal-content {
+            width: 100%; max-width: 420px; background: #111820;
+            border: 1px solid rgba(57,255,136,.5); border-radius: 16px;
+            padding: 22px; box-shadow: 0 0 35px rgba(57,255,136,.1);
+            animation: appear .2s ease;
+        }
+        @keyframes appear {
+            from { opacity: 0; transform: translateY(15px) scale(.97); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .event-choice {
+            width: 100%; text-align: left; padding: 13px; background: #1a252e;
+            border: 1px solid #34414d; border-radius: 9px; margin-top: 10px;
+            font-size: 12px; transition: .15s;
+        }
+        .event-choice:active { border-color: var(--green); background: #20352c; }
+        .toast {
+            position: fixed; left: 50%; bottom: 25px; transform: translateX(-50%);
+            background: #17251e; color: var(--green); border: 1px solid rgba(57,255,136,.4);
+            padding: 12px 18px; border-radius: 10px; z-index: 200; font-size: 11px;
+            text-align: center; width: max-content; max-width: 90%;
+            box-shadow: 0 5px 30px rgba(0,0,0,.5); animation: appear .2s ease;
+        }
+        .stat-card { background: #151b22; border: 1px solid #29333e; padding: 12px; border-radius: 10px; min-width: 0; }
+        .business-item {
+            display: flex; align-items: center; justify-content: space-between;
+            gap: 10px; background: #151b22; border: 1px solid #29333e;
+            padding: 13px; border-radius: 10px;
+        }
+        .business-item.owned { border-color: rgba(57,255,136,.35); }
+        .section-label { color: #89939f; font-size: 10px; letter-spacing: 2px; font-weight: 800; text-transform: uppercase; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #303b47; border-radius: 10px; }
+        @media (min-width: 640px) { body { padding-top: 20px; } #game { max-width: 500px; margin: auto; } }
+    </style>
+</head>
+<body>
+<div id="game" class="px-4">
+    <header class="pt-5 pb-5">
+        <div class="flex justify-between items-center mb-3">
+            <div class="text-[9px] tracking-[3px] text-gray-500 font-bold">RUSSIAN LIFE SIMULATOR</div>
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span>
+                <span class="text-[9px] green-text font-bold">SYSTEM ONLINE</span>
+            </div>
+        </div>
+        <h1 class="cyber-title text-3xl leading-tight">ОТ БОМЖА<br><span class="green-text">ДО МИЛЛИАРДЕРА</span></h1>
+        <div class="mt-3 flex justify-between items-center">
+            <span class="text-[10px] text-gray-500">ТВОЯ ЖИЗНЬ. ТВОИ ПРАВИЛА.</span>
+            <span id="dayCounter" class="text-[10px] text-gray-400">ДЕНЬ 1</span>
+        </div>
+    </header>
+
+    <section class="panel neon-border p-4 mb-4">
+        <div class="flex justify-between items-center mb-4">
+            <div>
+                <div class="section-label mb-1">ТЕКУЩИЙ СТАТУС</div>
+                <div id="rankName" class="text-sm font-extrabold green-text">Обитатель теплотрассы</div>
+            </div>
+            <div class="text-3xl" id="rankIcon">🛒</div>
+        </div>
+        <div class="grid grid-cols-2 gap-3">
+            <div class="stat-card">
+                <div class="text-[9px] text-gray-500 mb-2">💰 БАЛАНС</div>
+                <div id="money" class="text-xl font-extrabold green-text">0 ₽</div>
+            </div>
+            <div class="stat-card">
+                <div class="text-[9px] text-gray-500 mb-2">📈 ДОХОД / СЕК</div>
+                <div id="income" class="text-xl font-extrabold text-white">0 ₽</div>
+            </div>
+        </div>
+        <div class="mt-5 space-y-4">
+            <div>
+                <div class="flex justify-between text-[10px] mb-2">
+                    <span class="text-gray-400">❤️ ЗДОРОВЬЕ</span>
+                    <span id="healthValue" class="text-green-400">100%</span>
+                </div>
+                <div class="progress-track"><div id="healthBar" class="progress-fill bg-green-400" style="width:100%"></div></div>
+            </div>
+            <div>
+                <div class="flex justify-between text-[10px] mb-2">
+                    <span class="text-gray-400">🎭 НАСТРОЕНИЕ</span>
+                    <span id="moodValue" class="text-yellow-400">50%</span>
+                </div>
+                <div class="progress-track"><div id="moodBar" class="progress-fill bg-yellow-400" style="width:50%"></div></div>
+            </div>
+        </div>
+        <div class="mt-4 pt-3 border-t border-gray-800">
+            <div class="flex justify-between text-[9px] text-gray-500 mb-2">
+                <span>ПРОГРЕСС К СЛЕДУЮЩЕМУ РАНГУ</span><span id="rankProgressText">0%</span>
+            </div>
+            <div class="progress-track"><div id="rankProgressBar" class="progress-fill bg-green-400" style="width:0%"></div></div>
+        </div>
+    </section>
+
+    <section class="mb-5">
+        <div class="flex justify-between items-center mb-3">
+            <h2 class="section-label">01 / ДЕЙСТВИЯ</h2><span class="text-[9px] text-gray-600">ВЫЖИВАНИЕ</span>
+        </div>
+        <div class="space-y-2">
+            <button class="action-button" onclick="performAction('trash')">
+                <div class="flex justify-between items-center"><div><div class="text-xs font-bold">🗑 Порыться в мусорке</div><div class="text-[9px] text-gray-500 mt-1">Можно найти что-нибудь ценное</div></div><div class="text-right"><div class="green-text text-xs font-bold">+15–45 ₽</div><div class="red-text text-[9px]">-5 HP</div></div></div>
+            </button>
+            <button class="action-button" onclick="performAction('bottles')">
+                <div class="flex justify-between items-center"><div><div class="text-xs font-bold">🍾 Сдать бутылки</div><div class="text-[9px] text-gray-500 mt-1">Экологично. Почти прибыльно.</div></div><div class="text-right"><div class="green-text text-xs font-bold">+10–30 ₽</div><div class="text-[9px] text-gray-500">Безопасно</div></div></div>
+            </button>
+            <button class="action-button" onclick="performAction('guitar')">
+                <div class="flex justify-between items-center"><div><div class="text-xs font-bold">🎸 Уличная гитара</div><div class="text-[9px] text-gray-500 mt-1">Искусство против капитализма</div></div><div class="text-right"><div class="text-yellow-400 text-xs font-bold">+15 MOOD</div><div class="text-[9px] text-gray-500">+0–20 ₽</div></div></div>
+            </button>
+            <button class="action-button" onclick="performAction('rest')">
+                <div class="flex justify-between items-center"><div><div class="text-xs font-bold">🛌 Отдохнуть</div><div class="text-[9px] text-gray-500 mt-1">Пора восстановить силы</div></div><div class="text-right"><div class="green-text text-xs font-bold">+12 HP</div><div class="text-yellow-400 text-[9px]">+5 MOOD</div></div></div>
+            </button>
+        </div>
+    </section>
+
+    <section class="mb-5">
+        <div class="flex justify-between items-center mb-3"><h2 class="section-label">02 / КАРЬЕРА И БИЗНЕС</h2><span class="text-[9px] green-text">INVEST</span></div>
+        <div class="space-y-2" id="businessList"></div>
+    </section>
+
+    <section class="mb-5">
+        <div class="flex justify-between items-center mb-3"><h2 class="section-label">03 / РЕЙТИНГ ИГРОКОВ</h2><button onclick="loadLeaderboard()" class="text-[9px] green-text">ОБНОВИТЬ</button></div>
+        <div class="panel p-3"><div id="leaderboard" class="space-y-1 text-[10px] text-gray-500">Загрузка…</div><div id="myPlace" class="text-[10px] text-gray-400 mt-3"></div></div>
+    </section>
+
+    <section class="mb-5">
+        <div class="flex justify-between items-center mb-3"><h2 class="section-label">04 / ЖИЗНЕННЫЙ ЖУРНАЛ</h2><span class="text-[9px] text-gray-600">LIVE LOG</span></div>
+        <div id="journal" class="panel p-3 space-y-2 min-h-[90px]"><div class="text-[10px] text-gray-500">&gt; Система запущена. Новая жизнь начинается...</div></div>
+    </section>
+
+    <footer class="pb-8">
+        <div class="panel p-3">
+            <div class="flex justify-between items-center">
+                <div><div class="text-[10px] text-gray-400 font-bold">СИСТЕМА СОХРАНЕНИЯ</div><div id="saveStatus" class="text-[9px] text-green-500 mt-1">● Автосохранение включено</div></div>
+                <button onclick="saveGame(true)" class="text-[10px] border border-gray-700 rounded-lg px-3 py-2 text-gray-300">СОХРАНИТЬ</button>
+            </div>
+        </div>
+        <button onclick="confirmReset()" class="w-full text-center text-[9px] text-gray-600 mt-4 py-2">[ НАЧАТЬ НОВУЮ ЖИЗНЬ ]</button>
+        <div class="text-center text-[8px] text-gray-700 mt-3">LIFE SIMULATOR v2.0 // MADE IN RUSSIA</div>
+    </footer>
+</div>
+
+<div id="modal" class="modal-overlay hidden">
+    <div class="modal-content">
+        <div class="flex justify-between items-center mb-4"><div class="text-[9px] green-text tracking-[2px] font-bold">RANDOM EVENT</div><div class="text-xl">⚡</div></div>
+        <h2 id="eventTitle" class="text-lg font-extrabold mb-3">СОБЫТИЕ</h2>
+        <p id="eventDescription" class="text-xs text-gray-400 leading-relaxed mb-5">Описание события.</p>
+        <div id="eventChoices"></div>
+    </div>
+</div>
+<div id="boot" class="modal-overlay"><div class="text-xs green-text">Загрузка сохранения…</div></div>
+<div id="toast" class="toast hidden"></div>
+
+<script>
+/* Telegram WebApp SDK: инициализация и адаптация к теме */
+const tg = window.Telegram?.WebApp || null;
+
+function initTelegram() {
+    if (!tg) return;
+    tg.ready();
+    tg.expand();
+    if (tg.setHeaderColor) tg.setHeaderColor('#090b0e');
+    if (tg.setBackgroundColor) tg.setBackgroundColor('#090b0e');
+    if (tg.disableVerticalSwipes) tg.disableVerticalSwipes();
+    applyTelegramTheme();
+    tg.onEvent('themeChanged', applyTelegramTheme);
+}
+
+function applyTelegramTheme() {
+    if (!tg) return;
+    const theme = tg.themeParams || {};
+    if (theme.bg_color) document.documentElement.style.setProperty('--telegram-bg', theme.bg_color);
+    if (theme.text_color) document.documentElement.style.setProperty('--telegram-text', theme.text_color);
+}
+
+/* Игровые ранги и пороги перехода */
+const SAVE_KEY = 'homeless_to_billionaire_v1';
+const RANKS = [
+    { name: 'Обитатель теплотрассы', icon: '🛒', money: 0 },
+    { name: 'Студент в общежитии', icon: '🎓', money: 500 },
+    { name: 'Курьер на самокате', icon: '🛴', money: 3000 },
+    { name: 'Менеджер', icon: '💼', money: 15000 },
+    { name: 'Бизнесмен', icon: '🏢', money: 100000 },
+    { name: 'Олигарх', icon: '🤑', money: 1000000 }
+];
+
+/* Покупаемые источники пассивного дохода */
+const BUSINESSES = [
+    { id: 'cart', name: 'Тележка', description: 'Сбор и сдача вторсырья', icon: '🛒', price: 150, income: 2, requiredRank: 0, max: 1 },
+    { id: 'room', name: 'Место в общежитии', description: 'Крыша над головой и спокойный сон', icon: '🛏', price: 600, income: 5, requiredRank: 1, max: 1 },
+    { id: 'scooter', name: 'Курьерский самокат', description: 'Доставка еды по району', icon: '🛴', price: 1500, income: 12, requiredRank: 1, max: 1 },
+    { id: 'shawarma', name: 'Точка с шаурмой', description: 'Лаваш, мясо и бизнес-план', icon: '🌯', price: 5000, income: 35, requiredRank: 2, max: 1 },
+    { id: 'coffee', name: 'Кофейня у метро', description: 'Кофе по 250 рублей', icon: '☕', price: 20000, income: 120, requiredRank: 3, max: 1 },
+    { id: 'agency', name: 'Маркетинговое агентство', description: 'Продаем воздух в красивой упаковке', icon: '📊', price: 80000, income: 400, requiredRank: 3, max: 1 },
+    { id: 'factory', name: 'Сеть ресторанов', description: 'Масштабируем шаурму', icon: '🏭', price: 250000, income: 1200, requiredRank: 4, max: 1 },
+    { id: 'it', name: 'IT-компания', description: 'Разрабатываем очередной аналог всего', icon: '💻', price: 1000000, income: 5000, requiredRank: 4, max: 1 },
+    { id: 'holding', name: 'Международный холдинг', description: 'Теперь ты сам себе государство', icon: '🌍', price: 10000000, income: 50000, requiredRank: 5, max: 1 },
+    { id: 'empire', name: 'Финансовая империя', description: 'Деньги работают на деньги', icon: '👑', price: 100000000, income: 500000, requiredRank: 5, max: 1 }
+];
+
+/* Случайные события: два варианта выбора, каждый меняет параметры */
+const EVENTS = [
+    {
+        title: '🚔 Встреча с полицией',
+        description: 'Патруль заинтересовался твоим местом ночлега. Нужно что-то решать.',
+        choices: [
+            { text: '🤝 Вежливо объясниться', result: 'Все прошло спокойно. Сегодня повезло.', effect: { money: -10, mood: 5 } },
+            { text: '🏃 Срочно уйти', result: 'Ты успешно скрылся, но потерял силы.', effect: { health: -8, mood: -5 } }
+        ]
+    },
+    {
+        title: '💰 Найденный кошелек',
+        description: 'На остановке лежит кошелек. Внутри деньги и банковская карта.',
+        choices: [
+            { text: '💸 Забрать найденные деньги', result: 'Сегодня фортуна на твоей стороне.', effect: { money: 200, mood: 10 } },
+            { text: '🤝 Попытаться вернуть владельцу', result: 'Ты поступил достойно. Хорошие поступки тоже имеют цену.', effect: { mood: 20, money: 30 } }
+        ]
+    },
+    {
+        title: '🌧 Проливной дождь',
+        description: 'Ты оказался на улице во время сильного дождя.',
+        choices: [
+            { text: '🏃 Найти укрытие', result: 'Пришлось потратить немного денег, зато ты остался сухим.', effect: { money: -40, health: 5 } },
+            { text: '☔ Переждать на улице', result: 'Промок до нитки. Зато бесплатно.', effect: { health: -15, mood: -5 } }
+        ]
+    },
+    {
+        title: '🎰 Уличная лотерея',
+        description: 'Незнакомец предлагает испытать удачу в лотерее.',
+        choices: [
+            { text: '🎲 Поставить 50 рублей', result: 'Лотерея сыграла в твою пользу!', need: 50, effect: { money: 100, mood: 15 } },
+            { text: '🚶 Пройти мимо', result: 'Ты сохранил деньги и нервы.', effect: { mood: 5 } }
+        ]
+    },
+    {
+        title: '🍕 Бесплатная еда',
+        description: 'Волонтеры раздают горячие обеды.',
+        choices: [
+            { text: '🍲 Поесть', result: 'Горячая еда вернула тебе силы.', effect: { health: 15, mood: 10 } },
+            { text: '💰 Продать порцию', result: 'Небольшая, но прибыльная сделка.', effect: { money: 60, mood: -5 } }
+        ]
+    },
+    {
+        title: '📱 Стартап на миллион',
+        description: 'Знакомый предлагает вложиться в сомнительный стартап.',
+        choices: [
+            { text: '🚀 Рискнуть 100 рублей', result: 'Инвестиция неожиданно окупилась!', need: 100, effect: { money: 250, mood: 20 } },
+            { text: '❌ Отказаться', result: 'Осторожность иногда важнее амбиций.', effect: { mood: 5 } }
+        ]
+    },
+    {
+        title: '🧑‍💼 Предложение работы',
+        description: 'Работодатель ищет человека на подработку.',
+        choices: [
+            { text: '💼 Согласиться', result: 'Ты заработал немного денег и получил полезный опыт.', effect: { money: 250, mood: 10 } },
+            { text: '😴 Отказаться', result: 'Сегодня ты решил отдохнуть.', effect: { mood: 10 } }
+        ]
+    },
+    {
+        title: '📈 Экономический кризис',
+        description: 'В городе внезапно выросли цены. Твой кошелек этого не оценил.',
+        choices: [
+            { text: '🛡 Сохранить накопления', result: 'Ты избежал лишних расходов.', effect: { mood: -5 } },
+            { text: '🛍 Закупить товары', result: 'Покупки оказались удачными.', effect: { money: -100, mood: 10 } }
+        ]
+    },
+    {
+        title: '🎤 Талант обнаружен',
+        description: 'Твое выступление на улице привлекло внимание прохожих.',
+        choices: [
+            { text: '🎸 Продолжить концерт', result: 'Толпа оставила хорошие чаевые!', effect: { money: 120, mood: 20 } },
+            { text: '😎 Уйти на пике славы', result: 'Ты получил удовольствие от выступления.', effect: { mood: 15 } }
+        ]
+    },
+    {
+        title: '🩺 Проблемы со здоровьем',
+        description: 'Ты чувствуешь себя неважно. Стоит позаботиться о себе.',
+        choices: [
+            { text: '💊 Купить лекарства за 100 ₽', result: 'Самочувствие немного улучшилось.', effect: { money: -100, health: 20 } },
+            { text: '🛌 Отдохнуть', result: 'Организм постепенно восстановился.', effect: { health: 10, mood: 5 } }
+        ]
+    }
+];
+
+/* Создание начального состояния */
+function randomInt(min, max) { return Math.floor(Math.random() * (max - min + 1)) + min; }
+function createNewGame() {
+    return {
+        money: 0, health: 100, mood: 50, rank: 0, day: 1,
+        clicks: 0, nextEventAt: randomInt(3, 5), totalEarned: 0,
+        businesses: {}, lastSaved: Date.now(), lastSettle: Date.now(), daySecs: 0
+    };
+}
+
+/* ВАЖНО: сюда вставь адрес серверной функции (см. README.md). Пусто = сервер выключен */
+const API_URL = '';
+
+function clamp(value, min, max) { return Math.max(min, Math.min(max, value)); }
+const num = (v, d) => (v != null && Number.isFinite(Number(v))) ? Number(v) : d;
+
+/* Проверка и приведение сохранения к безопасному виду */
+function normalize(p) {
+    const now = Date.now(), money = Math.max(0, Math.floor(num(p.money, 0)));
+    const businesses = {};
+    BUSINESSES.forEach(b => { if (p.businesses && p.businesses[b.id]) businesses[b.id] = 1; });
+    return {
+        money, health: clamp(num(p.health, 100), 0, 100), mood: clamp(num(p.mood, 50), 0, 100),
+        rank: clamp(num(p.rank, 0), 0, RANKS.length - 1), day: Math.max(1, Math.floor(num(p.day, 1))),
+        daySecs: clamp(num(p.daySecs, 0), 0, 59), clicks: Math.max(0, num(p.clicks, 0)),
+        nextEventAt: Math.max(1, num(p.nextEventAt, randomInt(3, 5))),
+        totalEarned: Math.max(Math.floor(num(p.totalEarned, 0)), money), businesses,
+        lastSaved: num(p.lastSaved, 0), lastSettle: Math.min(num(p.lastSettle, num(p.lastSaved, now)), now)
+    };
+}
+function loadLocal() {
+    try { const saved = localStorage.getItem(SAVE_KEY); if (saved) return normalize(JSON.parse(saved)); }
+    catch (error) { console.error('Ошибка загрузки сохранения:', error); }
+    return null;
+}
+const localSave = loadLocal();
+const hadLocal = !!localSave;
+let game = localSave || createNewGame();
+
+function formatMoney(value) { return Math.floor(value).toLocaleString('ru-RU') + ' ₽'; }
+function getIncome() {
+    return BUSINESSES.reduce((total, business) => total + (game.businesses[business.id] || 0) * business.income, 0);
+}
+function showToast(message) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.classList.remove('hidden');
+    clearTimeout(showToast.timer);
+    showToast.timer = setTimeout(() => toast.classList.add('hidden'), 2200);
+}
+function addLog(message) {
+    const journal = document.getElementById('journal');
+    const entry = document.createElement('div');
+    entry.className = 'text-[10px] text-gray-400 leading-relaxed';
+    const time = new Date().toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    entry.textContent = '> [' + time + '] ' + message;
+    journal.prepend(entry);
+    while (journal.children.length > 8) journal.removeChild(journal.lastChild);
+}
+
+/* ===== Сохранение: устройство + Telegram Cloud + сервер ===== */
+let dirty = false, pushing = false, syncState = 'local', bootDone = false;
+
+/* Начисляет доход и игровое время за реально прошедшие секунды (в том числе пока игра была закрыта, до 24 ч) */
+function settle() {
+    const now = Date.now();
+    let secs = Math.floor((now - game.lastSettle) / 1000);
+    if (secs <= 0) return 0;
+    if (secs > 86400) { secs = 86400; game.lastSettle = now; } else game.lastSettle += secs * 1000;
+    const earned = getIncome() * secs;
+    if (earned > 0) { game.money += earned; game.totalEarned += earned; }
+    game.daySecs += secs;
+    const days = Math.floor(game.daySecs / 60);
+    if (days > 0) {
+        game.daySecs %= 60; game.day += days;
+        if (game.businesses.room) { game.health = clamp(game.health + days, 0, 100); game.mood = clamp(game.mood + days, 0, 100); }
+    }
+    updateRank();
+    return earned;
+}
+
+function setStatus() {
+    const el = document.getElementById('saveStatus');
+    if (!el) return;
+    const text = syncState === 'ok' ? 'Сохранено в облаке ' : syncState === 'fail' ? 'Облако недоступно, сохранено на устройстве ' : 'Сохранено на устройстве ';
+    el.textContent = '● ' + text + new Date().toLocaleTimeString('ru-RU');
+}
+
+function saveGame(force) {
+    try {
+        settle();
+        game.lastSaved = Date.now();
+        localStorage.setItem(SAVE_KEY, JSON.stringify(game));
+        dirty = true;
+        setStatus();
+    } catch (error) {
+        console.error('Ошибка сохранения:', error);
+        showToast('Ошибка сохранения!');
+    }
+    if (force === true) pushRemote();
+}
+
+const cloudOk = () => !!(tg && tg.CloudStorage && tg.isVersionAtLeast && tg.isVersionAtLeast('6.9'));
+const cloudGet = key => new Promise(res => cloudOk() ? tg.CloudStorage.getItem(key, (e, v) => res(e ? null : v)) : res(null));
+const cloudSet = (key, val) => new Promise((res, rej) => cloudOk() ? tg.CloudStorage.setItem(key, val, e => e ? rej(e) : res()) : rej(new Error('no-cloud')));
+const serverOk = () => !!(API_URL && tg && tg.initData);
+
+/* Запрос к серверу; личность игрока подтверждается подписью Telegram (initData) */
+async function api(action, payload) {
+    if (!serverOk()) throw new Error('no-server');
+    const ctrl = new AbortController(), timer = setTimeout(() => ctrl.abort(), 8000);
+    try {
+        const res = await fetch(API_URL, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: action === 'save', signal: ctrl.signal,
+            body: JSON.stringify({ action, initData: tg.initData, ...(payload || {}) })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || String(res.status));
+        return data;
+    } finally { clearTimeout(timer); }
+}
+
+async function pushRemote() {
+    if (pushing || !dirty || !(cloudOk() || serverOk())) return;
+    pushing = true; dirty = false;
+    const snapshot = JSON.stringify(game);
+    const tasks = [cloudSet('save', snapshot)];
+    if (serverOk()) tasks.push(api('save', { state: JSON.parse(snapshot) }).catch(e => {
+        if (e.message === 'suspicious') showToast('⚠ Сервер отклонил прогресс');
+        throw e;
+    }));
+    const results = await Promise.allSettled(tasks);
+    pushing = false;
+    const ok = results.some(r => r.status === 'fulfilled');
+    if (!ok) dirty = true;
+    syncState = ok ? 'ok' : 'fail';
+    setStatus();
+}
+
+/* При старте берём самое свежее сохранение из: устройство / Telegram Cloud / сервер */
+async function pullRemote() {
+    const [raw, server] = await Promise.all([cloudGet('save'), api('load').catch(() => null)]);
+    if (bootDone) return;
+    const list = [];
+    try { if (raw) list.push(normalize(JSON.parse(raw))); } catch (e) {}
+    if (server && server.state) list.push(normalize(server.state));
+    list.sort((a, b) => b.lastSaved - a.lastSaved);
+    if (list[0] && (!hadLocal || list[0].lastSaved > game.lastSaved)) {
+        game = list[0];
+        addLog('Прогресс загружен из облака.');
+    }
+}
+
+/* Применение эффектов к деньгам, здоровью и настроению */
+function changeStats(effect) {
+    if (effect.money !== undefined) {
+        const oldMoney = game.money;
+        game.money = Math.max(0, game.money + effect.money);
+        if (game.money > oldMoney) game.totalEarned += game.money - oldMoney;
+    }
+    if (effect.health !== undefined) game.health = clamp(game.health + effect.health, 0, 100);
+    if (effect.mood !== undefined) game.mood = clamp(game.mood + effect.mood, 0, 100);
+    updateRank();
+    updateUI();
+    saveGame();
+}
+
+/* Автоматическое повышение ранга по финансовым порогам */
+function updateRank() {
+    let newRank = game.rank;
+    while (newRank < RANKS.length - 1 && game.totalEarned >= RANKS[newRank + 1].money) newRank++;
+    if (newRank > game.rank) {
+        game.rank = newRank;
+        const rank = RANKS[newRank];
+        addLog('НОВЫЙ РАНГ: ' + rank.name);
+        showToast('🏆 Новый статус: ' + rank.name);
+        if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    }
+}
+function getRankProgress() {
+    if (game.rank >= RANKS.length - 1) return 100;
+    const currentThreshold = RANKS[game.rank].money;
+    const nextThreshold = RANKS[game.rank + 1].money;
+    return clamp(((game.totalEarned - currentThreshold) / (nextThreshold - currentThreshold)) * 100, 0, 100);
+}
+
+/* Обновление всех показателей на экране */
+function updateUI() {
+    const rank = RANKS[game.rank];
+    document.getElementById('money').textContent = formatMoney(game.money);
+    document.getElementById('income').textContent = formatMoney(getIncome());
+    document.getElementById('healthValue').textContent = game.health + '%';
+    document.getElementById('moodValue').textContent = game.mood + '%';
+    document.getElementById('healthBar').style.width = game.health + '%';
+    document.getElementById('moodBar').style.width = game.mood + '%';
+    document.getElementById('rankName').textContent = rank.name;
+    document.getElementById('rankIcon').textContent = rank.icon;
+    document.getElementById('dayCounter').textContent = 'ДЕНЬ ' + game.day;
+    const progress = getRankProgress();
+    document.getElementById('rankProgressText').textContent = Math.floor(progress) + '%';
+    document.getElementById('rankProgressBar').style.width = progress + '%';
+    document.getElementById('healthBar').className = 'progress-fill ' + (game.health < 30 ? 'bg-red-500' : 'bg-green-400');
+    document.getElementById('moodBar').className = 'progress-fill ' + (game.mood < 30 ? 'bg-red-500' : 'bg-yellow-400');
+    renderBusinesses();
+}
+
+/* Обработка игровых действий */
+function performAction(action) {
+    let message = '';
+    switch (action) {
+        case 'trash': {
+            if (game.health < 5) { showToast('Недостаточно здоровья! Отдохни.'); return; }
+            const reward = randomInt(15, 45);
+            changeStats({ money: reward, health: -5 });
+            message = 'Ты порылся в мусорке и нашел ' + reward + ' ₽.';
+            break;
+        }
+        case 'bottles': {
+            const reward = randomInt(10, 30);
+            changeStats({ money: reward });
+            message = 'Сдал бутылки и получил ' + reward + ' ₽.';
+            break;
+        }
+        case 'guitar': {
+            const reward = randomInt(0, 20);
+            changeStats({ mood: 15, money: reward });
+            message = 'Ты сыграл на гитаре. Настроение улучшилось.' + (reward > 0 ? ' Чаевые: ' + reward + ' ₽.' : '');
+            break;
+        }
+        case 'rest':
+            changeStats({ health: 12, mood: 5 });
+            message = 'Ты немного отдохнул и восстановил силы.';
+            break;
+        default: return;
+    }
+    addLog(message);
+    countAction();
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light');
+    saveGame();
+}
+
+/* События появляются через случайные 3–5 действий */
+function countAction() {
+    game.clicks++;
+    if (game.clicks >= game.nextEventAt) {
+        game.clicks = 0;
+        game.nextEventAt = randomInt(3, 5);
+        setTimeout(openRandomEvent, 250);
+    }
+}
+function openRandomEvent() {
+    if (!document.getElementById('modal').classList.contains('hidden')) return;
+    const event = EVENTS[randomInt(0, EVENTS.length - 1)];
+    document.getElementById('eventTitle').textContent = event.title;
+    document.getElementById('eventDescription').textContent = event.description;
+    const choices = document.getElementById('eventChoices');
+    choices.innerHTML = '';
+    event.choices.forEach(choice => {
+        const button = document.createElement('button');
+        button.className = 'event-choice';
+        button.textContent = choice.text;
+        const need = choice.need !== undefined ? choice.need : Math.max(0, -(choice.effect.money || 0));
+        if (game.money < need) { button.disabled = true; button.textContent += ' (нужно ' + formatMoney(need) + ')'; }
+        button.addEventListener('click', () => selectEventChoice(choice));
+        choices.appendChild(button);
+    });
+    document.getElementById('modal').classList.remove('hidden');
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('warning');
+}
+function selectEventChoice(choice) {
+    changeStats(choice.effect);
+    document.getElementById('modal').classList.add('hidden');
+    addLog(choice.result);
+    showToast(choice.result);
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    saveGame();
+}
+
+/* Покупка бизнеса с проверкой ранга, цены и лимита */
+function buyBusiness(id) {
+    const business = BUSINESSES.find(item => item.id === id);
+    if (!business) return;
+    const owned = game.businesses[id] || 0;
+    if (owned >= business.max) { showToast('У тебя уже есть это улучшение!'); return; }
+    if (game.rank < business.requiredRank) { showToast('Сначала повысь свой ранг!'); return; }
+    if (game.money < business.price) { showToast('Недостаточно денег!'); return; }
+    game.money -= business.price;
+    game.businesses[id] = owned + 1;
+    updateRank();
+    updateUI();
+    addLog('Приобретено: ' + business.name + '. Доход +' + formatMoney(business.income) + '/сек.');
+    showToast('🎉 Покупка успешна!');
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.notificationOccurred('success');
+    saveGame(true);
+}
+
+/* Отрисовка списка улучшений */
+function renderBusinesses() {
+    const container = document.getElementById('businessList');
+    if (!container) return;
+    const sig = BUSINESSES.map(b => (game.businesses[b.id] || 0) + ':' + (game.rank >= b.requiredRank) + ':' + (game.money >= b.price)).join('|');
+    if (sig === renderBusinesses.sig) return;
+    renderBusinesses.sig = sig;
+    container.innerHTML = '';
+    BUSINESSES.forEach(business => {
+        const owned = game.businesses[business.id] || 0;
+        const unlocked = game.rank >= business.requiredRank;
+        const affordable = game.money >= business.price;
+        const purchased = owned >= business.max;
+        const item = document.createElement('div');
+        item.className = 'business-item ' + (purchased ? 'owned' : '');
+        const info = document.createElement('div');
+        info.className = 'flex-1 min-w-0';
+        const name = document.createElement('div');
+        name.className = 'text-xs font-bold text-white';
+        name.textContent = business.icon + ' ' + business.name;
+        const description = document.createElement('div');
+        description.className = 'text-[9px] text-gray-500 mt-1';
+        description.textContent = business.description;
+        const income = document.createElement('div');
+        income.className = 'text-[9px] green-text mt-2 font-bold';
+        income.textContent = '+' + formatMoney(business.income) + '/сек' + (purchased ? ' • КУПЛЕНО' : '');
+        info.appendChild(name);
+        info.appendChild(description);
+        info.appendChild(income);
+        const button = document.createElement('button');
+        button.className = 'buy-button';
+        button.textContent = purchased ? 'КУПЛЕНО' : unlocked ? formatMoney(business.price) : 'ЗАКРЫТО';
+        button.disabled = purchased || !unlocked || !affordable;
+        button.addEventListener('click', () => buyBusiness(business.id));
+        item.appendChild(info);
+        item.appendChild(button);
+        container.appendChild(item);
+    });
+}
+
+/* Полный сброс сохранения */
+function confirmReset() {
+    const text = 'Ты действительно хочешь начать новую жизнь? Текущий прогресс будет удалён (место в рейтинге сохранится).';
+    const run = ok => {
+        if (!ok) return;
+        game = createNewGame();
+        document.getElementById('journal').innerHTML = '<div class="text-[10px] text-gray-500">&gt; Новая жизнь началась...</div>';
+        updateUI();
+        saveGame(true);
+        showToast('Новая жизнь началась!');
+    };
+    if (tg && tg.showConfirm && tg.isVersionAtLeast && tg.isVersionAtLeast('6.2')) tg.showConfirm(text, run);
+    else run(confirm(text));
+}
+
+/* Общий рейтинг игроков */
+async function loadLeaderboard() {
+    const box = document.getElementById('leaderboard'), me = document.getElementById('myPlace');
+    if (!API_URL) { box.textContent = 'Рейтинг ещё не подключён.'; return; }
+    if (!tg || !tg.initData) { box.textContent = 'Рейтинг доступен только внутри Telegram.'; return; }
+    try {
+        const data = await api('leaderboard');
+        box.innerHTML = '';
+        data.top.forEach((p, i) => {
+            const row = document.createElement('div');
+            row.className = 'flex justify-between items-center text-[11px] py-1.5 px-2 rounded-lg ' + (p.me ? 'bg-green-900/30 border border-green-500/40' : '');
+            const left = document.createElement('span');
+            left.className = 'truncate pr-2 text-gray-200';
+            left.textContent = (['🥇', '🥈', '🥉'][i] || (i + 1) + '.') + ' ' + ((RANKS[p.rank] || {}).icon || '') + ' ' + p.name;
+            const right = document.createElement('span');
+            right.className = 'green-text font-bold whitespace-nowrap';
+            right.textContent = formatMoney(p.score);
+            row.appendChild(left); row.appendChild(right); box.appendChild(row);
+        });
+        if (!data.top.length) box.textContent = 'Пока никого нет. Стань первым!';
+        me.textContent = data.place ? 'Твоё место: ' + data.place + ' из ' + data.total : 'Ты появишься в рейтинге после первого сохранения.';
+    } catch (e) { box.textContent = 'Не удалось загрузить рейтинг.'; }
+}
+
+/* Старт приложения и периодические задачи */
+async function startGame() {
+    initTelegram();
+    await Promise.race([pullRemote().catch(() => {}), new Promise(r => setTimeout(r, 4000))]);
+    bootDone = true;
+    const earned = settle();
+    if (earned > 0) addLog('Пока тебя не было, бизнес заработал ' + formatMoney(earned) + '.');
+    document.getElementById('boot').remove();
+    updateUI();
+    saveGame(true);
+    loadLeaderboard();
+
+    setInterval(() => { settle(); updateUI(); }, 1000);
+    setInterval(saveGame, 10000);
+    setInterval(pushRemote, 30000);
+    setInterval(loadLeaderboard, 90000);
+
+    document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') { saveGame(true); return; }
+        const gain = settle();
+        if (gain > 0) addLog('Пока тебя не было, бизнес заработал ' + formatMoney(gain) + '.');
+        updateUI();
+        loadLeaderboard();
+    });
+    window.addEventListener('pagehide', () => saveGame(true));
+    addLog('Добро пожаловать в новую жизнь.');
+}
+document.addEventListener('DOMContentLoaded', startGame);
+</script>
+</body>
+</html>
